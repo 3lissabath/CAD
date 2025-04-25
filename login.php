@@ -12,12 +12,10 @@ if ($conn->connect_error) {
     die("Error de conexión: " . $conn->connect_error);
 }
 
-// Verificar si se envió el formulario
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $correo = $_POST['email'];
     $password = $_POST['password'];
 
-    // Consulta para verificar el usuario
     $sql = "SELECT * FROM usuarios WHERE correo = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("s", $correo);
@@ -38,7 +36,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['nombre'] = $usuario['nombre']; // Almacena el nombre del usuario
             $rol_id = $usuario['rol_id'];
 
-            // Consulta corregida (id_rol en lugar de id)
             $stmtRol = $conn->prepare("SELECT nombre_rol FROM roles WHERE id_rol = ?");
             $stmtRol->bind_param("i", $rol_id);
             $stmtRol->execute();
