@@ -1,0 +1,576 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Gestión de Emergencias</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <style>
+        :root {
+            --azul-principal: #93D8E8;
+            --azul-oscuro: #2c3e50;
+            --verde: #27ae60;
+            --rojo: #e74c3c;
+            --naranja: #f39c12;
+            --sombra: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #f5f7fa;
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            grid-template-rows: 70px 1fr;
+            min-height: 100vh;
+        }
+
+        /* Barra superior */
+        .header {
+            grid-column: 1 / -1;
+            background-color: var(--azul-oscuro);
+            color: white;
+            display: flex;
+            align-items: center;
+            padding: 0 30px;
+            box-shadow: var(--sombra);
+            z-index: 10;
+        }
+
+        .logo {
+            height: 40px;
+            margin-right: 15px;
+        }
+
+        .header-title {
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        /* Panel izquierdo */
+        .sidebar {
+            background: white;
+            box-shadow: var(--sombra);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+
+        .section-title {
+            font-size: 16px;
+            color: var(--azul-oscuro);
+            margin: 20px 0 10px;
+            padding-bottom: 5px;
+            border-bottom: 2px solid var(--azul-principal);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+            .section-title i {
+                color: var(--azul-principal);
+            }
+
+        /* Guías y protocolos */
+        .protocol-list {
+            list-style: none;
+        }
+
+        .protocol-item {
+            margin-bottom: 8px;
+        }
+
+        .protocol-link {
+            display: block;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            color: #333;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+            .protocol-link:hover {
+                background: var(--azul-principal);
+                color: white;
+            }
+
+            .protocol-link i {
+                font-size: 14px;
+            }
+
+        /* Asignador de recursos */
+        .resource-selector {
+            margin-top: 15px;
+        }
+
+        .resource-option {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+            .resource-option:hover {
+                transform: translateX(5px);
+            }
+
+        .resource-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            margin-right: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 12px;
+        }
+
+        .policia {
+            background-color: var(--azul-oscuro);
+        }
+
+        .bomberos {
+            background-color: var(--rojo);
+        }
+
+        .seguridad {
+            background-color: var(--naranja);
+        }
+
+        .medicos {
+            background-color: var(--verde);
+        }
+
+        /* Contenido principal */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 300px;
+            grid-template-rows: 1fr 250px;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        /* Mapa */
+        .map-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: var(--sombra);
+            padding: 15px;
+            grid-row: 1 / -1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .map-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            margin-bottom: 15px;
+        }
+
+        .map-search {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
+            .map-search input {
+                flex: 1;
+                padding: 10px;
+                border: 1px solid #ddd;
+                border-radius: 4px 0 0 4px;
+                font-size: 14px;
+            }
+
+            .map-search button {
+                padding: 10px 15px;
+                background-color: var(--azul-principal);
+                color: white;
+                border: none;
+                border-radius: 0 4px 4px 0;
+                cursor: pointer;
+            }
+
+        .coordinates {
+            margin-top: 10px;
+        }
+
+            .coordinates label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: bold;
+                color: var(--azul-oscuro);
+            }
+
+            .coordinates input {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+            }
+
+        /* Chat */
+        .chat-container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: var(--sombra);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            padding: 15px;
+            background: var(--azul-principal);
+            color: white;
+            border-radius: 10px 10px 0 0;
+            font-weight: 600;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 18px;
+            font-size: 14px;
+        }
+
+        .received {
+            align-self: flex-start;
+            background: #f1f1f1;
+            border-radius: 0 18px 18px 18px;
+        }
+
+        .sent {
+            align-self: flex-end;
+            background: var(--azul-principal);
+            color: white;
+            border-radius: 18px 0 18px 18px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #eee;
+        }
+
+            .chat-input input {
+                flex: 1;
+                padding: 10px 15px;
+                border: 1px solid #ddd;
+                border-radius: 20px;
+                outline: none;
+            }
+
+            .chat-input button {
+                margin-left: 10px;
+                background: var(--azul-principal);
+                color: white;
+                border: none;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                cursor: pointer;
+            }
+
+        /* Recursos asignados */
+        .assigned-resources {
+            background: white;
+            border-radius: 10px;
+            box-shadow: var(--sombra);
+            padding: 15px;
+        }
+
+        .resource-card {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+            .resource-card i {
+                margin-right: 10px;
+                font-size: 18px;
+            }
+
+        @media (max-width: 1200px) {
+            body
+
+        {
+            grid-template-columns: 1fr;
+            grid-template-rows: 70px auto 1fr;
+        }
+
+        .sidebar {
+            grid-row: 2;
+            grid-column: 1;
+        }
+
+        .main-content {
+            grid-row: 3;
+            grid-column: 1;
+            grid-template-columns: 1fr;
+        }
+
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <img src="../logo.png" alt="Logo" class="logo">
+        <h1 class="header-title">Centro de Operaciones de Emergencia</h1>
+    </header>
+
+    <aside class="sidebar">
+        <h2 class="section-title">
+            <i class="fas fa-file-alt"></i>
+            Guías y Protocolos
+        </h2>
+        <ul class="protocol-list">
+            <li class="protocol-item">
+                <a href="/protocolo2.pdf" class="protocol-link" target="_blank">
+                    <i class="fas fa-file-pdf"></i>
+                    Guía Primeros Auxilios
+                </a>
+            </li>
+            <li class="protocol-item">
+                <a href="protocolo3.pdf" class="protocol-link" target="_blank">
+                    <i class="fas fa-file-pdf"></i>
+                    Procedimiento Incendios
+                </a>
+            </li>
+        </ul>
+
+        <h2 class="section-title">
+            <i class="fas fa-users-cog"></i>
+            Asignar Recursos
+        </h2>
+        <div class="resource-selector">
+            <div class="resource-option">
+                <div class="resource-icon policia">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <span>Policía</span>
+            </div>
+            <div class="resource-option">
+                <div class="resource-icon bomberos">
+                    <i class="fas fa-fire-extinguisher"></i>
+                </div>
+                <span>Bomberos</span>
+            </div>
+            <div class="resource-option">
+                <div class="resource-icon seguridad">
+                    <i class="fas fa-user-shield"></i>
+                </div>
+                <span>Seguridad</span>
+            </div>
+            <div class="resource-option">
+                <div class="resource-icon medicos">
+                    <i class="fas fa-ambulance"></i>
+                </div>
+                <span>Equipo Médico</span>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <section class="map-container">
+            <div class="map-header">
+                <h2 class="section-title">
+                    <i class="fas fa-map-marked-alt"></i>
+                    Mapa de Situación
+                </h2>
+            </div>
+
+            <div id="map"></div>
+
+            <div class="map-search">
+                <input type="text" id="address-input" placeholder="Buscar ubicación...">
+                <button id="search-button">
+                    <i class="fas fa-search"></i>
+                </button>
+            </div>
+
+            <div class="coordinates">
+                <label for="coordenadas">Coordenadas:</label>
+                <input type="text" id="coordenadas" name="coordenadas" readonly>
+            </div>
+        </section>
+
+        <!-- Recursos asignados -->
+        <section class="assigned-resources">
+            <h2 class="section-title">
+                <i class="fas fa-list-check"></i>
+                Recursos Asignados
+            </h2>
+            <div class="resource-card">
+                <i class="fas fa-shield-alt" style="color: #2c3e50;"></i>
+                <span>Policía - Unidad 12</span>
+            </div>
+            <div class="resource-card">
+                <i class="fas fa-fire-extinguisher" style="color: #e74c3c;"></i>
+                <span>Bomberos - Carro 5</span>
+            </div>
+            <div class="resource-card">
+                <i class="fas fa-user-shield" style="color: #f39c12;"></i>
+                <span>Seguridad - Equipo 3</span>
+            </div>
+        </section>
+
+        <section class="chat-container">
+            <div class="chat-header">
+                <i class="fas fa-comments"></i>
+                Chat de Coordinación
+            </div>
+            <div class="chat-messages">
+                <div class="message received">
+                    Equipo médico en camino 
+                </div>
+                <div class="message sent">
+                    Recibido, procedan con protocolo 4
+                </div>
+                <div class="message received">
+                    Necesitamos refuerzos en zona norte
+                </div>
+                <div class="message sent">
+                    Enviando unidad policial 7
+                </div>
+            </div>
+            <div class="chat-input">
+                <input type="text" placeholder="Escribe un mensaje...">
+                <button><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </section>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([19.4326, -99.1332], 12);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        let marker = null;
+
+        map.on('click', function(e) {
+            if (marker) {
+                map.removeLayer(marker);
+            }
+            marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('coordenadas').value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+        });
+
+        // Buscar ubicación
+        document.getElementById('search-button').addEventListener('click', function() {
+            const address = document.getElementById('address-input').value;
+            if (address.trim() === '') return;
+
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+
+                        map.setView([lat, lon], 15);
+                        marker = L.marker([lat, lon]).addTo(map);
+                        document.getElementById('coordenadas').value = lat.toFixed(6) + ', ' + lon.toFixed(6);
+                    } else {
+                        alert('Ubicación no encontrada');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al buscar la ubicación');
+                });
+        });
+
+        // Chat (funcionalidad básica)
+        const chatInput = document.querySelector('.chat-input input');
+        const chatButton = document.querySelector('.chat-input button');
+        const chatMessages = document.querySelector('.chat-messages');
+
+        function sendMessage() {
+            const message = chatInput.value.trim();
+            if (message) {
+                const msgElement = document.createElement('div');
+                msgElement.classList.add('message', 'sent');
+                msgElement.textContent = message;
+                chatMessages.appendChild(msgElement);
+                chatInput.value = '';
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+
+                // Simular respuesta
+                setTimeout(() => {
+                    const responses = [
+                        "Mensaje recibido",
+                        "Procediendo según protocolo",
+                        "Unidad en camino",
+                        "Necesitamos más información"
+                    ];
+                    const response = responses[Math.floor(Math.random() * responses.length)];
+
+                    const replyElement = document.createElement('div');
+                    replyElement.classList.add('message', 'received');
+                    replyElement.textContent = response;
+                    chatMessages.appendChild(replyElement);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 1000);
+            }
+        }
+
+        chatButton.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Asignación de recursos
+        document.querySelectorAll('.resource-option').forEach(option => {
+            option.addEventListener('click', function() {
+                const resourceType = this.querySelector('span').textContent;
+                alert(`Recurso asignado: ${resourceType}`);
+            });
+        });
+    </script>
+</body>
+</html>

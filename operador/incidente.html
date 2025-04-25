@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro del incidente</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+            display: flex;
+            flex-wrap: wrap;
+        }
+        
+        .blue-bar {
+            background-color: #93D8E8;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        
+        .logo {
+            position: absolute;
+            top: 50%;
+            right: 20px;
+            transform: translateY(-50%);
+            max-height: 50px;
+            width: auto;
+        }
+        
+        /* Panel izquierdo con mapa */
+        .map-panel {
+            flex: 1;
+            min-width: 300px;
+            padding: 20px;
+            background-color: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        #map {
+            height: 400px;
+            width: 100%;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+        }
+        
+        .search-box {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px 0 0 4px;
+            font-size: 14px;
+        }
+        
+        .search-box button {
+            padding: 10px 15px;
+            background-color: #93D8E8;
+            color: white;
+            border: none;
+            border-radius: 0 4px 4px 0;
+            cursor: pointer;
+        }
+        
+        /* Panel derecho con formulario */
+        .form-panel {
+            flex: 1;
+            min-width: 300px;
+            max-width: 600px;
+            padding: 20px;
+            background-color: white;
+            margin: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        
+         #clasificacion option[value="broma"] {
+            background-color: #c300ff; /* Amarillo para broma */
+            color: #000;
+        }
+        
+        #clasificacion option[value="emergencia_real"] {
+            background-color: #ff8800; /* Rojo anaranjado para emergencia real */
+            color: white;
+        }
+        
+        #clasificacion option[value="tty"] {
+            background-color: #4682B4; 
+            color: white;
+        }
+        #prioridad option[value="grave"] {
+            background-color: #ff1100;
+            color: #000;
+        }
+        
+        #prioridad option[value="media"] {
+            background-color: #80f894; 
+            color: white;
+        }
+        
+        #prioridad option[value="baja"] {
+            background-color: #eee454; 
+            color: white;
+        }
+
+        .submit-btn {
+            background-color: #93D8E8;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        
+        .submit-btn:hover {
+            background-color: #82c8d8;
+        }
+        
+        @media (max-width: 768px) {
+            .map-panel, .form-panel {
+                margin: 10px;
+                min-width: calc(100% - 20px);
+            }
+        }
+    </style>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+</head>
+<body>
+    <div class="blue-bar">
+        <img src="logo.png" alt="Logo" class="logo">
+        REGISTRO DE INCIDENTE
+    </div>
+    
+    <!-- Panel izquierdo con mapa interactivo -->
+    <div class="map-panel">
+        <h3>Ubicación del Incidente</h3>
+        <div id="map"></div>
+        <div class="search-box">
+            <input type="text" id="address-input" placeholder="Buscar ubicación...">
+            <button id="search-button">Buscar</button>
+        </div>
+        <div class="form-group">
+            <label for="coordenadas">Coordenadas:</label>
+            <input type="text" id="coordenadas" name="coordenadas" readonly>
+        </div>
+    </div>
+    
+    <div class="form-panel">
+        <form action="incidente.php" method="post" onsubmit="return validarFormulario()">
+        <div class="form-group">
+                <label for="paso">¿Qué pasó?:</label>
+                <input type="text" id="paso" name="paso" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="tipo_auxilio">Tipo de auxilio:</label>
+                <select id="tipo_auxilio" name="tipo_auxilio" required>
+                    <option value="">Seleccione un tipo</option>
+                    <option value="medico">Médico</option>
+                    <option value="proteccion_civil">Protección Civil</option>
+                    <option value="seguridad">Seguridad</option>
+                    <option value="servicios_publicos">Servicios Públicos</option>
+                    <option value="otros">Otros servicios</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="personas_involucradas">Número de personas involucradas:</label>
+                <input type="number" id="personas_involucradas" name="personas_involucradas" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="numero">Número celular:</label>
+                <input type="text" id="numero" name="numero" required>
+            </div>
+            
+                <div class="form-group">
+                <label for="clasificacion">Clasificación de la llamada:</label>
+                <select id="clasificacion" name="clasificacion" required>
+                    <option value="">Seleccione un tipo</option>
+                    <option value="broma">Broma</option>
+                    <option value="emergencia_real">Emergencia Real</option>
+                    <option value="tty">TTY</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="prioridad">Prioridad:</label>
+                <select id="prioridad" name="prioridad" required>
+                    <option value="">Seleccione la prioridad</option>
+                    <option value="grave">Grave</option>
+                    <option value="media">Media</option>
+                    <option value="baja">Baja</option>
+                </select>
+            </div>
+            <input type="hidden" id="coordenadas" name="coordenadas" value="">
+
+            <button type="submit" class="submit-btn">ENVIAR REPORTE</button>
+        </form>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <!-- Nominatim para geocodificación -->
+    <script>
+        // Inicializar mapa
+        const map = L.map('map').setView([19.4326, -99.1332], 12);
+        
+        // Añadir capa de mapa base
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        
+        // Marcador para la ubicación
+        let marker = null;
+        
+        // Evento para colocar marcador al hacer clic en el mapa
+        map.on('click', function(e) {
+            if (marker) {
+                map.removeLayer(marker);
+            }
+            marker = L.marker(e.latlng).addTo(map);
+            document.getElementById('coordenadas').value = e.latlng.lat.toFixed(6) + ', ' + e.latlng.lng.toFixed(6);
+        });
+        
+        // Buscar ubicación
+        document.getElementById('search-button').addEventListener('click', function() {
+            const address = document.getElementById('address-input').value;
+            if (address.trim() === '') return;
+            
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        const lat = parseFloat(data[0].lat);
+                        const lon = parseFloat(data[0].lon);
+                        
+                        if (marker) {
+                            map.removeLayer(marker);
+                        }
+                        
+                        map.setView([lat, lon], 15);
+                        marker = L.marker([lat, lon]).addTo(map);
+                        document.getElementById('coordenadas').value = lat.toFixed(6) + ', ' + lon.toFixed(6);
+                    } else {
+                        alert('Ubicación no encontrada');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error al buscar la ubicación');
+                });
+        });
+
+        function validarFormulario() {
+            // Validar que se haya seleccionado una ubicación
+            const coordenadas = document.getElementById('coordenadas').value;
+            if (!coordenadas) {
+                alert('Por favor seleccione una ubicación en el mapa');
+                return false;
+            }
+            
+            // Validar otros campos si es necesario
+            if (!document.getElementById('paso').value) {
+                alert('Por favor describa qué pasó');
+                return false;
+            }
+            
+            return true;
+        }
+    </script>
+</body>
+</html>
