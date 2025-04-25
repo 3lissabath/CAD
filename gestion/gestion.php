@@ -6,17 +6,14 @@ $dbname = "base_cad";
 
 $conn = new mysqli($servername, $username, $password, $dbname);
 
-// Verificar conexión
 if ($conn->connect_error) {
     die("Conexión fallida: " . $conn->connect_error);
 }
 
-// Procesar asignación de horario si se envió el formulario
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['usuario_id']) && isset($_POST['horario_id'])) {
     $usuario_id = $_POST['usuario_id'];
     $horario_id = $_POST['horario_id'];
     
-    // Obtener información del horario seleccionado
     $sql_horario = "SELECT nombre_horario, hora_inicio, hora_fin FROM horarios WHERE id_horario = ?";
     $stmt_horario = $conn->prepare($sql_horario);
     $stmt_horario->bind_param("i", $horario_id);
@@ -26,12 +23,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['usuario_id']) && isset
     
     $descripcion_horario = $horario['nombre_horario'] . " (" . $horario['hora_inicio'] . " - " . $horario['hora_fin'] . ")";
     
-    // Actualizar el horario en la tabla usuarios
     $sql_update_usuario = "UPDATE usuarios SET id_horario = ? WHERE id_usuario = ?";
     $stmt_update_usuario = $conn->prepare($sql_update_usuario);
     $stmt_update_usuario->bind_param("ii", $horario_id, $usuario_id);
     
-    // Actualizar el horario en la tabla gestion_personal
     $sql_update_personal = "UPDATE gestion_personal gp
                            JOIN usuarios u ON gp.id_personal = u.id_personal
                            SET gp.id_horario = ?
@@ -46,7 +41,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['usuario_id']) && isset
     }
 }
 
-// Obtener lista de usuarios con sus horarios actuales
 $sql_usuarios = "SELECT u.id_usuario, u.nombre, u.apellido, 
                  CONCAT(u.nombre, ' ', u.apellido) AS nombre_completo,
                  u.id_horario, h.nombre_horario, h.hora_inicio, h.hora_fin,
@@ -65,7 +59,6 @@ if ($result_usuarios->num_rows > 0) {
     }
 }
 
-// Obtener lista de horarios disponibles
 $sql_horarios = "SELECT id_horario, nombre_horario, hora_inicio, hora_fin, dias_semana 
                  FROM horarios 
                  WHERE activo = 1
@@ -174,7 +167,6 @@ $conn->close();
             color: var(--azul-principal);
         }
         
-        /* Estilos para la tabla de trabajadores */
         .workers-table {
             width: 100%;
             border-collapse: collapse;
@@ -198,7 +190,6 @@ $conn->close();
             background-color: #f5f5f5;
         }
         
-        /* Estilos para los horarios */
         .schedule-container {
             display: flex;
             gap: 20px;
@@ -222,7 +213,6 @@ $conn->close();
             color: #333;
         }
         
-        /* Botones */
         .btn {
             padding: 10px 20px;
             border-radius: 6px;
@@ -251,7 +241,6 @@ $conn->close();
             font-size: 14px;
         }
         
-        /* Formulario de asignación */
         .assign-form {
             margin-top: 30px;
             padding-top: 20px;
