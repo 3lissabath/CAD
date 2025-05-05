@@ -54,7 +54,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                         header("Location: " . $base_url . "despachador/despachador.html");
                         break;
                     case 'Supervisor_Op':
-                        header("Location: " . $base_url . "supervisor/supOp.php");
+                        header("Location: " . $base_url . "supervisorOp/supOp.php");
                         break;
                     case 'Administrador':
                         header("Location: " . $base_url . "gestion/gestion.html");
