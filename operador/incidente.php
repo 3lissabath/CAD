@@ -1,80 +1,98 @@
 <?php
 session_start();
+
+if (empty($_SESSION['id_usuario'])) {
+    header("Location: ../login.php");
+    exit();
+}
+
 require_once '../db.php';
 
 ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 $mensaje_exito = '';
 $mensaje_error = '';
+$incidente = null;
+$edicion = false;
 
+// Process form
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     try {
-        
-        if (empty($_POST['coordenadas'])) {
-            throw new Exception("Debes seleccionar una ubicación en el mapa");
-        }
+        if (isset($_POST['edit_id'])) {
+            $edicion = true;
+            $edit_id = intval($_POST['edit_id']);
+            $stmt = $conn->prepare("SELECT * FROM incidentes WHERE folio_incidente = ?");
+            $stmt->bind_param("i", $edit_id);
+            $stmt->execute();
+            $resultado = $stmt->get_result();
+            $incidente = $resultado->fetch_assoc();
 
-        $coordenadas = trim($_POST['coordenadas']);
-        $coords = explode(',', $coordenadas);
-        
-        if (count($coords) != 2) {
-            throw new Exception("Formato de coordenadas inválido. Debe ser 'latitud,longitud'");
-        }
-        
-        $latitud = trim($coords[0]);
-        $longitud = trim($coords[1]);
-        
-        if (!is_numeric($latitud) || !is_numeric($longitud)) {
-            throw new Exception("Las coordenadas deben ser valores numéricos");
-        }
-
-    
-        $quepaso = trim($_POST['paso'] ?? '');
-        $tipo_auxilio = trim($_POST['tipo_auxilio'] ?? '');
-        $num_personas = intval($_POST['num_personas'] ?? 0);
-        $telefono = trim($_POST['numero'] ?? '');
-        $clasificacion = trim($_POST['clasificacion'] ?? '');
-        $prioridad = trim($_POST['prioridad'] ?? '');
-        $id_usuario_reporta = $_SESSION['id_usuario'] ?? null;
-        
-        $sql = "INSERT INTO incidentes (
-            quepaso, tipo_auxilio, hora_incidente, fecha_incidente, 
-            num_personas, telefono, id_usuario_reporta, 
-            clasificacion, prioridad, latitud, longitud
-        ) VALUES (?, ?, CURTIME(), NOW(), ?, ?, ?, ?, ?, ?, ?)";
-        
-        $stmt = $conn->prepare($sql);
-        if (!$stmt) {
-            throw new Exception("Error al preparar la consulta: " . $conn->error);
-        }
-        
-        $stmt->bind_param(
-            "sssissssss", 
-            $quepaso, 
-            $tipo_auxilio, 
-            $num_personas, 
-            $telefono, 
-            $id_usuario_reporta,
-            $clasificacion, 
-            $prioridad,
-            $latitud,
-            $longitud
-        );
-        
-        if ($stmt->execute()) {
-            $folio_incidente = $stmt->insert_id;
-            $mensaje_exito = "Incidente registrado correctamente (Folio #$folio_incidente)";
-            
-            echo '<script>
-                document.getElementById("form-incidente").reset();
-                document.getElementById("coordenadas_display").value = "";
-                document.getElementById("coordenadas").value = "";
-                if (window.marker) window.map.removeLayer(window.marker);
-            </script>';
         } else {
-            throw new Exception("Error al registrar: " . $stmt->error);
+            if (empty($_POST['coordenadas'])) {
+                throw new Exception("Debes seleccionar una ubicación en el mapa");
+            }
+
+            [$latitud, $longitud] = explode(',', $_POST['coordenadas']);
+            $latitud = trim($latitud);
+            $longitud = trim($longitud);
+
+            $quepaso = trim($_POST['paso']);
+            $tipo_auxilio = trim($_POST['tipo_auxilio']);
+            $num_personas = intval($_POST['num_personas']);
+            $telefono = trim($_POST['telefono']);
+            $clasificacion = trim($_POST['clasificacion']);
+            $prioridad = trim($_POST['prioridad']);
+            $colonia = trim($_POST['colonia']);
+            $localidad = trim($_POST['localidad']);
+            $municipio = trim($_POST['municipio']);
+            $id_usuario_reporta = $_SESSION['id_usuario'] ?? NULL;
+            $id_unidad_asignada = $_POST['id_unidad_asignada'] ?? NULL;
+
+            if (isset($_POST['folio_incidente'])) {
+                $folio_incidente = intval($_POST['folio_incidente']);
+                $stmt = $conn->prepare("UPDATE incidentes SET quepaso=?, tipo_auxilio=?, num_personas=?, telefono=?, clasificacion=?, prioridad=?, latitud=?, longitud=?, colonia=?, localidad=?, municipio=?, fecha_actualizacion=NOW() WHERE folio_incidente=?");
+                $stmt->bind_param("ssissssssssi", 
+                    $quepaso, 
+                    $tipo_auxilio, 
+                    $num_personas, 
+                    $telefono, 
+                    $clasificacion, 
+                    $prioridad, 
+                    $latitud, 
+                    $longitud, 
+                    $colonia, 
+                    $localidad, 
+                    $municipio, 
+                    $folio_incidente
+                );
+                $stmt->execute();
+                $mensaje_exito = "Incidente actualizado correctamente";
+                $edicion = false;
+            } else {
+                $stmt = $conn->prepare("INSERT INTO incidentes 
+                    (quepaso, tipo_auxilio, hora_incidente, fecha_incidente, fecha_actualizacion, num_personas, latitud, longitud, telefono, id_usuario_reporta, clasificacion, prioridad, id_unidad_asignada, colonia, localidad, municipio) 
+                    VALUES (?, ?, CURTIME(), NOW(), NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+
+                $stmt->bind_param("ssisssississs", 
+                    $quepaso,
+                    $tipo_auxilio,
+                    $num_personas,
+                    $latitud,
+                    $longitud,
+                    $telefono,
+                    $id_usuario_reporta,
+                    $clasificacion,
+                    $prioridad,
+                    $id_unidad_asignada,
+                    $colonia,
+                    $localidad,
+                    $municipio
+                );
+
+                $stmt->execute();
+                $mensaje_exito = "Incidente registrado correctamente";
+            }
         }
     } catch (Exception $e) {
         $mensaje_error = $e->getMessage();
@@ -82,324 +100,362 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
+<?php
+// [Previous PHP code remains exactly the same until the HTML starts]
+?>
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro del incidente</title>
+    <title>Sistema de Gestión de Incidentes</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
     <style>
-        body {
-            font-family: Arial, sans-serif;
+        :root {
+            --primary: #4361ee;
+            --primary-dark: #3a56d4;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+            --border-radius: 8px;
+            --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --transition: all 0.3s ease;
+        }
+
+        * {
             margin: 0;
             padding: 0;
-            background-color: #f4f4f4;
-            display: flex;
-            flex-wrap: wrap;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         }
-        
-        .blue-bar {
-            background-color: #93D8E8;
-            color: white;
-            padding: 20px;
-            text-align: center;
-            font-size: 24px;
-            font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-            position: relative;
+
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
             display: flex;
-            justify-content: center;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: #f5f7fa;
+        }
+
+        .navbar {
+            background: var(--primary);
+            padding: 1rem 2rem;
+            display: flex;
             align-items: center;
-            width: 100%;
+            justify-content: space-between;
+            box-shadow: var(--box-shadow);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
-        
-        .logo {
-            position: absolute;
-            top: 50%;
-            right: 20px;
-            transform: translateY(-50%);
-            max-height: 50px;
-            width: auto;
-        }
-        
-        .map-panel {
-            flex: 1;
-            min-width: 300px;
-            padding: 20px;
-            background-color: white;
-            margin: 20px;
-            border-radius: 8px;
-            box-shadow: 0 0 10px rgba(0,0,0,0.1);
-        }
-        
-        #map {
-            height: 400px;
-            width: 100%;
-            border-radius: 8px;
-            margin-bottom: 15px;
-            border: 1px solid #ddd;
-        }
-        
-        .search-box {
+
+        .main-container {
             display: flex;
-            margin-bottom: 15px;
-        }
-        
-        .search-box input {
             flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px 0 0 4px;
-            font-size: 14px;
+            overflow: hidden;
         }
-        
-        .search-box button {
-            padding: 10px 15px;
-            background-color: #93D8E8;
-            color: white;
-            border: none;
-            border-radius: 0 4px 4px 0;
-            cursor: pointer;
-        }
-        
-        .form-panel {
-            flex: 1;
-            min-width: 300px;
-            max-width: 600px;
-            padding: 20px;
-            background-color: white;
-            margin: 20px;
-            border-radius: 8px;
+
+        .form-container {
+            width: 40%;
+            padding: 2rem;
+            overflow-y: auto;
+            background: white;
             box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
-        
-        .form-group {
-            margin-bottom: 20px;
+
+        .map-container {
+            width: 60%;
+            height: 100%;
+            position: relative;
         }
-        
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-left: 1px solid #ddd;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
         label {
             display: block;
-            margin-bottom: 8px;
-            font-weight: bold;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
         }
-        
+
         input[type="text"],
+        input[type="tel"],
         input[type="number"],
+        textarea,
         select {
             width: 100%;
-            padding: 10px;
+            padding: 0.75rem;
             border: 1px solid #ddd;
-            border-radius: 4px;
-            box-sizing: border-box;
-        }
-        
-        #clasificacion option[value="broma"] {
-            background-color: #c300ff; 
-            color: #000;
-        }
-        
-        #clasificacion option[value="emergencia_real"] {
-            background-color: #ff8800; 
-            color: white;
-        }
-        
-        #clasificacion option[value="tty"] {
-            background-color: #4682B4; 
-            color: white;
-        }
-        
-        #prioridad option[value="grave"] {
-            background-color: #ff1100;
-            color: #000;
-        }
-        
-        #prioridad option[value="media"] {
-            background-color: #80f894; 
-            color: white;
-        }
-        
-        #prioridad option[value="baja"] {
-            background-color: #eee454; 
-            color: white;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            transition: var(--transition);
+            background-color: white;
         }
 
-        .submit-btn {
-            background-color: #93D8E8;
-            color: white;
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
             border: none;
-            padding: 12px 20px;
-            border-radius: 4px;
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 16px;
-            width: 100%;
-        }
-        
-        .submit-btn:hover {
-            background-color: #82c8d8;
-        }
-        
-        .mensaje-exito {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px;
-            background: #4CAF50;
-            color: white;
-            border-radius: 5px;
-            z-index: 1000;
+            transition: var(--transition);
+            gap: 0.5rem;
         }
 
-        .mensaje-error {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 15px;
-            background: #f44336;
+        .btn-primary {
+            background-color: var(--primary);
             color: white;
-            border-radius: 5px;
-            z-index: 1000;
         }
-        
+
+        .btn-primary:hover {
+            background-color: var(--primary-dark);
+        }
+
+        .btn-warning {
+            background-color: var(--warning);
+            color: white;
+        }
+
+        .location-details {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            margin-top: 1rem;
+            border: 1px solid #eee;
+        }
+
+        .location-details p {
+            margin: 0.5rem 0;
+            font-size: 0.9rem;
+        }
+
+        .location-details strong {
+            color: var(--primary);
+        }
+
         @media (max-width: 768px) {
-            .map-panel, .form-panel {
-                margin: 10px;
-                min-width: calc(100% - 20px);
+            .main-container {
+                flex-direction: column;
+            }
+            
+            .form-container, .map-container {
+                width: 100%;
+                height: 50%;
             }
         }
     </style>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
 </head>
 <body>
-    <div class="blue-bar">
-        <img src="../logo.png" alt="Logo" class="logo">
-        REGISTRO DE INCIDENTE
+
+<nav class="navbar">
+    <a href="incidente.php" class="navbar-brand">
+        <i class="fas fa-exclamation-triangle"></i> SGI
+    </a>
+    <div class="navbar-links">
+        <a href="incidente.php" class="nav-link"><i class="fas fa-list"></i> Incidentes</a>
+        <a href="chat.php" class="nav-link"><i class="fas fa-comments"></i> Chat</a>
+        <a href="dashboard.php" class="nav-link"><i class="fas fa-chart-line"></i> Dashboard</a>
+        <a href="../logout.php" class="nav-link"><i class="fas fa-sign-out-alt"></i> Salir</a>
     </div>
-    
-    
-    <div class="map-panel">
-        <h3>Ubicación del Incidente</h3>
-        <div id="map"></div>
-        <div class="search-box">
-            <input type="text" id="address-input" placeholder="Buscar ubicación...">
-            <button id="search-button">Buscar</button>
-        </div>
-        <div class="form-group">
-    <label for="coordenadas_display">Coordenadas:</label>
-    <input type="text" id="coordenadas_display" readonly>
-    <input type="hidden" id="coordenadas" name="coordenadas" value="">
-</div>
-    </div>
-    <div class="form-panel">
-    <form id="form-incidente" action="incidente.php" method="post" onsubmit="return validarFormulario()">                <div class="form-group">
-                <label for="paso">¿Qué pasó?:</label>
-                <input type="text" id="paso" name="paso" required value="<?= htmlspecialchars($_POST['paso'] ?? '') ?>">
-            </div>
-            
+</nav>
+
+<div class="main-container">
+    <div class="form-container">
+        <?php if ($mensaje_exito): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($mensaje_exito) ?></div>
+        <?php endif; ?>
+        
+        <?php if ($mensaje_error): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($mensaje_error) ?></div>
+        <?php endif; ?>
+
+        <h2>Formulario de Incidente</h2>
+        <form method="POST" onsubmit="return validarFormulario()">
+            <?php if ($edicion): ?>
+                <input type="hidden" name="folio_incidente" value="<?= htmlspecialchars($incidente['folio_incidente']) ?>">
+            <?php endif; ?>
+
             <div class="form-group">
-                <label for="tipo_auxilio">Tipo de auxilio:</label>
+                <label for="paso"><i class="fas fa-question-circle"></i> ¿Cuál es su emergencia?</label>
+                <textarea id="paso" name="paso" required><?= htmlspecialchars($incidente['quepaso'] ?? '') ?></textarea>
+            </div>
+
+            <div class="form-group">
+                <label for="tipo_auxilio"><i class="fas fa-ambulance"></i> Tipo de auxilio</label>
                 <select id="tipo_auxilio" name="tipo_auxilio" required>
-                    <option value="">Seleccione un tipo</option>
-                    <option value="medico" <?= ($_POST['tipo_auxilio'] ?? '') == 'medico' ? 'selected' : '' ?>>Médico</option>
-                    <option value="proteccion_civil" <?= ($_POST['tipo_auxilio'] ?? '') == 'proteccion_civil' ? 'selected' : '' ?>>Protección Civil</option>
-                    <option value="seguridad" <?= ($_POST['tipo_auxilio'] ?? '') == 'seguridad' ? 'selected' : '' ?>>Seguridad</option>
-                    <option value="servicios_publicos" <?= ($_POST['tipo_auxilio'] ?? '') == 'servicios_publicos' ? 'selected' : '' ?>>Servicios Públicos</option>
-                    <option value="otros" <?= ($_POST['tipo_auxilio'] ?? '') == 'otros' ? 'selected' : '' ?>>Otros servicios</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="num_personas">Número de personas involucradas:</label>
-                <input type="number" id="num_personas" name="num_personas" min="1" required value="<?= htmlspecialchars($_POST['num_personas'] ?? '') ?>">
-            </div>
-            
-            <div class="form-group">
-                <label for="numero">Número celular:</label>
-                <input type="text" id="numero" name="numero" required value="<?= htmlspecialchars($_POST['numero'] ?? '') ?>">
-            </div>
-            
-            <div class="form-group">
-                <label for="clasificacion">Clasificación de la llamada:</label>
-                <select id="clasificacion" name="clasificacion" required>
-                    <option value="">Seleccione un tipo</option>
-                    <option value="broma" <?= ($_POST['clasificacion'] ?? '') == 'broma' ? 'selected' : '' ?>>Broma</option>
-                    <option value="emergencia_real" <?= ($_POST['clasificacion'] ?? '') == 'emergencia_real' ? 'selected' : '' ?>>Emergencia Real</option>
-                    <option value="tty" <?= ($_POST['clasificacion'] ?? '') == 'tty' ? 'selected' : '' ?>>TTY</option>
-                </select>
-            </div>
-            
-            <div class="form-group">
-                <label for="prioridad">Prioridad:</label>
-                <select id="prioridad" name="prioridad" required>
-                    <option value="">Seleccione la prioridad</option>
-                    <option value="grave" <?= ($_POST['prioridad'] ?? '') == 'grave' ? 'selected' : '' ?>>Grave</option>
-                    <option value="media" <?= ($_POST['prioridad'] ?? '') == 'media' ? 'selected' : '' ?>>Media</option>
-                    <option value="baja" <?= ($_POST['prioridad'] ?? '') == 'baja' ? 'selected' : '' ?>>Baja</option>
+                    <option value="">Seleccione...</option>
+                    <option value="Medico" <?= ($incidente['tipo_auxilio'] ?? '') == 'Medico' ? 'selected' : '' ?>>Médico</option>
+                    <option value="Proteccion Civil" <?= ($incidente['tipo_auxilio'] ?? '') == 'Proteccion Civil' ? 'selected' : '' ?>>Protección Civil</option>
+                    <option value="Seguridad" <?= ($incidente['tipo_auxilio'] ?? '') == 'Seguridad' ? 'selected' : '' ?>>Seguridad</option>
                 </select>
             </div>
 
-            <button type="submit" class="submit-btn">ENVIAR REPORTE</button>
+            <div class="form-group">
+                <label for="num_personas"><i class="fas fa-users"></i> Número de personas</label>
+                <input type="number" id="num_personas" name="num_personas" value="<?= htmlspecialchars($incidente['num_personas'] ?? '') ?>" min="1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="telefono"><i class="fas fa-phone"></i> Teléfono</label>
+                <input type="tel" id="telefono" name="telefono" value="<?= htmlspecialchars($incidente['telefono'] ?? '') ?>" required>
+            </div>
+
+            <div class="form-group">
+                <label for="clasificacion"><i class="fas fa-filter"></i> Clasificación</label>
+                <select id="clasificacion" name="clasificacion" required>
+                    <option value="">Seleccione...</option>
+                    <option value="Broma" <?= ($incidente['clasificacion'] ?? '') == 'Broma' ? 'selected' : '' ?>>Broma</option>
+                    <option value="Emergencia Real" <?= ($incidente['clasificacion'] ?? '') == 'Emergencia Real' ? 'selected' : '' ?>>Emergencia Real</option>
+                    <option value="TTY" <?= ($incidente['clasificacion'] ?? '') == 'TTY' ? 'selected' : '' ?>>TTY</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="prioridad"><i class="fas fa-exclamation"></i> Prioridad</label>
+                <select id="prioridad" name="prioridad" required>
+                    <option value="">Seleccione...</option>
+                    <option value="Alta" <?= ($incidente['prioridad'] ?? '') == 'Alta' ? 'selected' : '' ?>>Alta</option>
+                    <option value="Media" <?= ($incidente['prioridad'] ?? '') == 'Media' ? 'selected' : '' ?>>Media</option>
+                    <option value="Baja" <?= ($incidente['prioridad'] ?? '') == 'Baja' ? 'selected' : '' ?>>Baja</option>
+                </select>
+            </div>
+
+            <input type="hidden" id="colonia" name="colonia" value="<?= htmlspecialchars($incidente['colonia'] ?? '') ?>">
+            <input type="hidden" id="localidad" name="localidad" value="<?= htmlspecialchars($incidente['localidad'] ?? '') ?>">
+            <input type="hidden" id="municipio" name="municipio" value="<?= htmlspecialchars($incidente['municipio'] ?? '') ?>">
+
+            <div class="form-group">
+                <label><i class="fas fa-map-marked-alt"></i> Ubicación en el mapa</label>
+                <input type="text" id="coordenadas_display" class="form-control" readonly 
+                       value="<?= $edicion ? htmlspecialchars($incidente['latitud'] . ', ' . $incidente['longitud']) : '' ?>">
+                <input type="hidden" id="coordenadas" name="coordenadas" 
+                       value="<?= $edicion ? htmlspecialchars($incidente['latitud'] . ',' . $incidente['longitud']) : '' ?>">
+                
+                <div class="location-details" id="location-details" style="<?= $edicion ? '' : 'display:none;' ?>">
+                    <p><strong>Colonia:</strong> <span id="colonia-display"><?= htmlspecialchars($incidente['colonia'] ?? '') ?></span></p>
+                    <p><strong>Localidad:</strong> <span id="localidad-display"><?= htmlspecialchars($incidente['localidad'] ?? '') ?></span></p>
+                    <p><strong>Municipio:</strong> <span id="municipio-display"><?= htmlspecialchars($incidente['municipio'] ?? '') ?></span></p>
+                </div>
+                
+                <input type="hidden" id="colonia" name="colonia" value="<?= htmlspecialchars($incidente['colonia'] ?? '') ?>">
+                <input type="hidden" id="localidad" name="localidad" value="<?= htmlspecialchars($incidente['localidad'] ?? '') ?>">
+                <input type="hidden" id="municipio" name="municipio" value="<?= htmlspecialchars($incidente['municipio'] ?? '') ?>">
+                
+                <small class="text-muted">Haz clic en el mapa para seleccionar la ubicación</small>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save"></i> <?= $edicion ? 'Actualizar' : 'Registrar' ?>
+            </button>
         </form>
     </div>
-
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script>
-  // Configuración del mapa
-const map = L.map('map').setView([19.4326, -99.1332], 12);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-
-let marker = null;
-
-// Función para actualizar coordenadas
-function actualizarCoordenadas(lat, lng) {
-    const coords = lat + ',' + lng;
-    const coordsInput = document.getElementById('coordenadas');
     
-    coordsInput.value = coords;
-    document.getElementById('coordenadas_display').value = coords;
-    
-    console.log('Coordenadas establecidas:', coordsInput.value);
-}
+    <div class="map-container">
+        <div id="map"></div>
+    </div>
+</div>
 
-// Evento click en el mapa
-map.on('click', function(e) {
-    if (marker) map.removeLayer(marker);
-    marker = L.marker(e.latlng).addTo(map);
-    actualizarCoordenadas(
-        e.latlng.lat.toFixed(6), 
-        e.latlng.lng.toFixed(6)
-    );
-});
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script>
+    // Initialize map
+    const map = L.map('map').setView([19.4326, -99.1332], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
 
-// Evento de búsqueda
-document.getElementById('search-button').addEventListener('click', function() {
-    const address = document.getElementById('address-input').value;
-    if (!address.trim()) return;
-    
-    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.length > 0) {
-                const lat = data[0].lat;
-                const lon = data[0].lon;
-                
-                if (marker) map.removeLayer(marker);
-                map.setView([lat, lon], 15);
-                marker = L.marker([lat, lon]).addTo(map);
-                actualizarCoordenadas(lat, lon);
-            } else {
-                alert('Ubicación no encontrada');
-            }
-        });
-});
+    let marker = null;
 
-function validarFormulario() {
-    const coords = document.getElementById('coordenadas').value;
-    if (!coords) {
-        alert('Por favor selecciona una ubicación en el mapa');
-        return false;
+    <?php if ($edicion && isset($incidente['latitud']) && isset($incidente['longitud'])): ?>
+        marker = L.marker([<?= $incidente['latitud'] ?>, <?= $incidente['longitud'] ?>]).addTo(map);
+        document.getElementById('location-details').style.display = 'block';
+    <?php endif; ?>
+
+    // Handle map clicks
+    map.on('click', function(e) {
+        if (marker) map.removeLayer(marker);
+        marker = L.marker(e.latlng).addTo(map);
+
+        const lat = e.latlng.lat.toFixed(6);
+        const lon = e.latlng.lng.toFixed(6);
+        const coords = lat + ', ' + lon;
+
+        document.getElementById('coordenadas').value = lat + ',' + lon;
+        document.getElementById('coordenadas_display').value = coords;
+
+        // Show loading state
+        const locationDetails = document.getElementById('location-details');
+        locationDetails.style.display = 'block';
+        locationDetails.innerHTML = '<p>Obteniendo detalles de ubicación...</p>';
+
+        // Reverse geocode
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&accept-language=es`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.address) {
+                    const colonia = data.address.suburb || data.address.neighbourhood || 'No especificado';
+                    const localidad = data.address.city || data.address.town || data.address.village || 'No especificado';
+                    const municipio = data.address.state || 'No especificado';
+
+                    document.getElementById('colonia').value = colonia;
+                    document.getElementById('localidad').value = localidad;
+                    document.getElementById('municipio').value = municipio;
+
+                    locationDetails.innerHTML = `
+                        <p><strong>Colonia:</strong> ${colonia}</p>
+                        <p><strong>Localidad:</strong> ${localidad}</p>
+                        <p><strong>Municipio:</strong> ${municipio}</p>
+                    `;
+                } else {
+                    locationDetails.innerHTML = '<p>No se pudieron obtener los detalles de la ubicación</p>';
+                }
+            })
+            .catch(error => {
+                locationDetails.innerHTML = '<p>Error al obtener la ubicación</p>';
+                console.error('Error:', error);
+            });
+    });
+
+    function validarFormulario() {
+        if (!document.getElementById('coordenadas').value) {
+            alert('Debes seleccionar una ubicación en el mapa');
+            return false;
+        }
+        return true;
     }
-    return true;
-}
-    </script>
+
+    // Fix map display on load
+    setTimeout(() => {
+        map.invalidateSize();
+    }, 100);
+</script>
+
 </body>
 </html>
